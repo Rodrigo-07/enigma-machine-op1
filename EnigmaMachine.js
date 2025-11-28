@@ -38,17 +38,17 @@ class Enigma {
 
         const rotors = (config.rotors || []).map((rConf) => {
 
-        const ringChar = (rConf.ring || "A").toUpperCase();
-        const rotor = new Rotor(rConf.type, ringChar);
+            const ringChar = (rConf.ring || "A").toUpperCase();
+            const rotor = new Rotor(rConf.type, ringChar);
 
-        if (rConf.position && typeof rotor.rotate_to === "function") {
-            const posIndex = ALPHABET.indexOf(rConf.position.toUpperCase());
-        if (posIndex >= 0) {
-            rotor.rotate_to(posIndex);
-        }
-        }
+            if (rConf.position && typeof rotor.rotate_to === "function") {
+                const posIndex = ALPHABET.indexOf(rConf.position.toUpperCase());
+            if (posIndex >= 0) {
+                rotor.rotate_to(posIndex);
+            }
+            }
 
-        return rotor;
+            return rotor;
     });
 
     const r1 = rotors[0] || null;
