@@ -10,15 +10,13 @@ class Enigma {
      * @param {Rotor} r1
      * @param {Rotor} r2
      * @param {Rotor} r3
-     * @param {Rotor} r4
      * @param {Plugboard} plugboard
      */
-    constructor(reflector, r1, r2, r3, r4, plugboard) {
+    constructor(reflector, r1, r2, r3, plugboard) {
         this.ref = reflector;
         this.r1 = r1;
         this.r2 = r2;
         this.r3 = r3;
-        this.r4 = r4;
         this.pb = plugboard;
     }
 
