@@ -41,14 +41,14 @@ new EXRLoader()
     });
 
 // --- Iluminação ---
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
 scene.add(ambientLight);
 
-const mainLight = new THREE.DirectionalLight(0xffffff, 1.0);
+const mainLight = new THREE.DirectionalLight(0xffffff, 0.5);
 mainLight.position.set(5, 10, 5);
 mainLight.castShadow = true;
-mainLight.shadow.mapSize.width = 2048;
-mainLight.shadow.mapSize.height = 2048;
+mainLight.shadow.mapSize.width = 1024;
+mainLight.shadow.mapSize.height = 1024;
 scene.add(mainLight);
 
 // --- Chão ---
@@ -58,7 +58,7 @@ const floorNormal = textureLoader.load('./chao/Poliigon_ConcreteFloorPoured_7656
 const floorRoughness = textureLoader.load('./chao/Poliigon_ConcreteFloorPoured_7656_Roughness.jpg');
 const floorAO = textureLoader.load('./chao/Poliigon_ConcreteFloorPoured_7656_AmbientOcclusion.jpg');
 
-const FLOOR_SIZE = 500;
+const FLOOR_SIZE = 200;
 const TILE_WORLD_SIZE = 5;
 const REPEAT = FLOOR_SIZE / TILE_WORLD_SIZE;
 
@@ -614,7 +614,7 @@ plugboardGroup.position.set(0, tableHeight + tableTopThickness / 2, -0.08);
 // Base do plugboard
 const plugboardBaseGeometry = new THREE.BoxGeometry(0.6, 0.03, 0.15);
 const plugboardBaseMaterial = new THREE.MeshStandardMaterial({
-    color: 0x1a1a1a,
+    color: 0x4a4a4a,
     roughness: 0.5,
     metalness: 0.4
 });
@@ -652,28 +652,37 @@ const bottomRowLetters = 'NOPQRSTUVWXYZ'.split('');
         
         // Label da letra
         const labelCanvas = document.createElement('canvas');
-        labelCanvas.width = 32;
-        labelCanvas.height = 32;
+        labelCanvas.width = 128;
+        labelCanvas.height = 128;
         const labelCtx = labelCanvas.getContext('2d');
+        
+        // Fundo branco brilhante
         labelCtx.fillStyle = '#ffffff';
-        labelCtx.fillRect(0, 0, 32, 32);
-        labelCtx.font = 'bold 20px monospace';
+        labelCtx.fillRect(0, 0, 128, 128);
+        
+        // Letra preta grande e grossa
+        labelCtx.font = 'bold 90px Arial Black';
         labelCtx.fillStyle = '#000000';
         labelCtx.textAlign = 'center';
         labelCtx.textBaseline = 'middle';
-        labelCtx.fillText(letter, 16, 16);
+        labelCtx.fillText(letter, 64, 64);
         
         const labelTexture = new THREE.CanvasTexture(labelCanvas);
+        labelTexture.needsUpdate = true;
+        
         const labelMaterial = new THREE.MeshStandardMaterial({
             map: labelTexture,
-            roughness: 0.6,
-            metalness: 0.0
+            roughness: 0.2,
+            metalness: 0.0,
+            emissive: 0xffffff,
+            emissiveIntensity: 0.3,
+            emissiveMap: labelTexture
         });
         
-        const labelGeometry = new THREE.PlaneGeometry(0.015, 0.015);
+        const labelGeometry = new THREE.PlaneGeometry(0.022, 0.022);
         const label = new THREE.Mesh(labelGeometry, labelMaterial);
         label.rotation.x = -Math.PI / 2;
-        label.position.set(xPos, 0.041, zPos);
+        label.position.set(xPos, 0.043, zPos);
         plugboardGroup.add(label);
         
         plugboardSockets[letter] = {
@@ -937,7 +946,7 @@ async function processEnigmaWithVisualization(letter) {
         `Rotores: ${toChar(enigmaRotor3.position)} ${toChar(enigmaRotor2.position)} ${toChar(enigmaRotor1.position)}\n` +
         (plugboardPairs ? `Plugboard: ${plugboardPairs}\n` : '') +
         `\n` +
-        `P=Plugboard ; = Reset`,
+        `1=Plugboard ; = Reset`,
         ''
     );
     statusTexture.needsUpdate = true;
@@ -964,7 +973,7 @@ function resetMessage() {
         `\n` +
         `Rotores: ${toChar(enigmaRotor3.position)} ${toChar(enigmaRotor2.position)} ${toChar(enigmaRotor1.position)}\n` +
         `\n` +
-        `P=Plugboard ; = Reset`,
+        `1=Plugboard ; = Reset`,
         'Pronto para nova mensagem'
     );
     statusTexture.needsUpdate = true;
@@ -980,19 +989,48 @@ function togglePlugboardMode() {
     plugboardMode = !plugboardMode;
     
     if (plugboardMode) {
+        const currentConnections = Object.keys(plugboardConnections)
+            .filter((k, i, arr) => arr.indexOf(k) === i && k < plugboardConnections[k])
+            .map(k => `${k}↔${plugboardConnections[k]}`)
+            .join(' ');
+        
         drawStatus(
-            'MODO PLUGBOARD ATIVO\n' +
+            '═══ MODO PLUGBOARD ═══\n' +
             '\n' +
-            'Clique em duas letras para conectá-las\n' +
-            'ou clique em uma conexão existente\n' +
-            'para removê-la.\n' +
+            '📍 COMO USAR:\n' +
+            '1. Clique na PRIMEIRA letra\n' +
+            '2. Clique na SEGUNDA letra\n' +
+            '3. Conexão criada!\n' +
             '\n' +
-            'Pressione P para sair do modo',
-            'Modo de configuração'
+            (currentConnections ? `Conexões: ${currentConnections}\n` : 'Nenhuma conexão ainda\n') +
+            '\n' +
+            '1 = Sair | Clique em cabo = Remover',
+            '🔌 Clique em uma letra para começar'
         );
     } else {
         selectedSocketForPlugboard = null;
-        drawStatus('Aguardando entrada...', 'Pressione qualquer tecla');
+        // Resetar cores dos sockets
+        Object.keys(plugboardSockets).forEach(letter => {
+            if (!plugboardConnections[letter]) {
+                plugboardSockets[letter].socket.material.color.setHex(0x8b7355);
+            }
+        });
+        
+        const plugboardPairs = Object.keys(plugboardConnections)
+            .filter((k, i, arr) => arr.indexOf(k) === i && k < (plugboardConnections[k] || 'ZZ'))
+            .map(k => `${k}-${plugboardConnections[k]}`)
+            .join(' ');
+        
+        drawStatus(
+            `Input:  ${inputMessage}\n` +
+            `Output: ${outputMessage}\n` +
+            `\n` +
+            `Rotores: ${toChar(enigmaRotor3.position)} ${toChar(enigmaRotor2.position)} ${toChar(enigmaRotor1.position)}\n` +
+            (plugboardPairs ? `Plugboard: ${plugboardPairs}\n` : '') +
+            `\n` +
+            `1=Plugboard ; = Reset`,
+            'Aguardando entrada...'
+        );
     }
     statusTexture.needsUpdate = true;
 }
@@ -1014,15 +1052,21 @@ function addPlugboardConnection(letter1, letter2) {
         plugboardConnections[letter2] = letter1;
         enigmaPlugboard.connections = plugboardConnections;
         
+        const allConnections = Object.keys(plugboardConnections)
+            .filter((k, i, arr) => arr.indexOf(k) === i && k < plugboardConnections[k])
+            .map(k => `${k}↔${plugboardConnections[k]}`)
+            .join(' ');
+        
         drawStatus(
-            `CONEXÃO ADICIONADA: ${letter1} <-> ${letter2}\n` +
+            '═══ MODO PLUGBOARD ═══\n' +
             '\n' +
-            'Conexões atuais:\n' +
-            Object.keys(plugboardConnections)
-                .filter((k, i, arr) => arr.indexOf(k) === i && k < plugboardConnections[k])
-                .map(k => `${k} <-> ${plugboardConnections[k]}`)
-                .join(', '),
-            'Clique em outra letra ou pressione P'
+            `✅ CONECTADO: ${letter1} ↔ ${letter2}\n` +
+            '\n' +
+            `Todas conexões:\n${allConnections}\n` +
+            '\n' +
+            'Clique em mais letras para conectar\n' +
+            'ou pressione 1 para sair',
+            '🔌 Continue configurando'
         );
         statusTexture.needsUpdate = true;
     }
@@ -1051,15 +1095,25 @@ function removePlugboardConnection(letter) {
     delete plugboardConnections[connectedLetter];
     enigmaPlugboard.connections = plugboardConnections;
     
+    // Resetar cores dos sockets
+    plugboardSockets[letter].socket.material.color.setHex(0x8b7355);
+    plugboardSockets[connectedLetter].socket.material.color.setHex(0x8b7355);
+    
+    const remainingConnections = Object.keys(plugboardConnections)
+        .filter((k, i, arr) => arr.indexOf(k) === i && k < plugboardConnections[k])
+        .map(k => `${k}↔${plugboardConnections[k]}`)
+        .join(' ');
+    
     drawStatus(
-        `CONEXÃO REMOVIDA: ${letter} <-> ${connectedLetter}\n` +
+        '═══ MODO PLUGBOARD ═══\n' +
         '\n' +
-        'Conexões restantes:\n' +
-        Object.keys(plugboardConnections)
-            .filter((k, i, arr) => arr.indexOf(k) === i && k < plugboardConnections[k])
-            .map(k => `${k} <-> ${plugboardConnections[k]}`)
-            .join(', '),
-        'Modo Plugboard ativo'
+        `❌ REMOVIDO: ${letter} ↔ ${connectedLetter}\n` +
+        '\n' +
+        (remainingConnections ? `Conexões: ${remainingConnections}\n` : 'Nenhuma conexão\n') +
+        '\n' +
+        'Clique em letras para conectar\n' +
+        'ou pressione 1 para sair',
+        '🔌 Continue configurando'
     );
     statusTexture.needsUpdate = true;
 }
@@ -1136,7 +1190,7 @@ function setRotorPosition(rotorIndex, letter) {
         `Rotores: ${toChar(enigmaRotor3.position)} ${toChar(enigmaRotor2.position)} ${toChar(enigmaRotor1.position)}\n` +
         (plugboardPairs ? `Plugboard: ${plugboardPairs}\n` : '') +
         '\n' +
-        'P=Plugboard ; = Reset',
+        '1=Plugboard ; = Reset',
         'Clique nos rotores para configurar'
     );
     statusTexture.needsUpdate = true;
@@ -1170,19 +1224,54 @@ window.addEventListener('click', (event) => {
             } else if (!selectedSocketForPlugboard) {
                 // Primeira seleção
                 selectedSocketForPlugboard = clickedLetter;
-                plugboardSockets[clickedLetter].socket.material.color.setHex(0x00ff00);
+                plugboardSockets[clickedLetter].socket.material.color.setHex(0xffff00);
+                
+                const currentConnections = Object.keys(plugboardConnections)
+                    .filter((k, i, arr) => arr.indexOf(k) === i && k < plugboardConnections[k])
+                    .map(k => `${k}↔${plugboardConnections[k]}`)
+                    .join(' ');
+                
                 drawStatus(
-                    `Letra selecionada: ${clickedLetter}\n` +
+                    '═══ MODO PLUGBOARD ═══\n' +
                     '\n' +
-                    'Clique em outra letra para conectar',
-                    'Aguardando segunda letra...'
+                    `🟡 PRIMEIRA LETRA: ${clickedLetter}\n` +
+                    '\n' +
+                    '👉 Agora clique na SEGUNDA letra\n' +
+                    '   para criar a conexão\n' +
+                    '\n' +
+                    (currentConnections ? `Conexões: ${currentConnections}` : 'Nenhuma conexão ainda'),
+                    `⚡ Conectando ${clickedLetter} com...`
                 );
                 statusTexture.needsUpdate = true;
             } else {
                 // Segunda seleção - criar conexão
-                plugboardSockets[selectedSocketForPlugboard].socket.material.color.setHex(0x8b7355);
-                addPlugboardConnection(selectedSocketForPlugboard, clickedLetter);
-                selectedSocketForPlugboard = null;
+                if (clickedLetter === selectedSocketForPlugboard) {
+                    // Clicou na mesma letra - cancelar
+                    plugboardSockets[selectedSocketForPlugboard].socket.material.color.setHex(0x8b7355);
+                    selectedSocketForPlugboard = null;
+                    
+                    const currentConnections = Object.keys(plugboardConnections)
+                        .filter((k, i, arr) => arr.indexOf(k) === i && k < plugboardConnections[k])
+                        .map(k => `${k}↔${plugboardConnections[k]}`)
+                        .join(' ');
+                    
+                    drawStatus(
+                        '═══ MODO PLUGBOARD ═══\n' +
+                        '\n' +
+                        '❌ Seleção cancelada\n' +
+                        '\n' +
+                        (currentConnections ? `Conexões: ${currentConnections}\n` : 'Nenhuma conexão ainda\n') +
+                        '\n' +
+                        'Clique em uma letra para começar',
+                        '🔌 Tente novamente'
+                    );
+                    statusTexture.needsUpdate = true;
+                } else {
+                    // Criar conexão
+                    plugboardSockets[selectedSocketForPlugboard].socket.material.color.setHex(0x8b7355);
+                    addPlugboardConnection(selectedSocketForPlugboard, clickedLetter);
+                    selectedSocketForPlugboard = null;
+                }
             }
         }
         return;
@@ -1271,7 +1360,7 @@ window.addEventListener('keydown', async (event) => {
                 `Rotores: ${toChar(enigmaRotor3.position)} ${toChar(enigmaRotor2.position)} ${toChar(enigmaRotor1.position)}\n` +
                 (plugboardPairs ? `Plugboard: ${plugboardPairs}\n` : '') +
                 `\n` +
-                `P=Plugboard ; = Reset`,
+                `1=Plugboard ; = Reset`,
                 'Configuração cancelada'
             );
             statusTexture.needsUpdate = true;
@@ -1286,8 +1375,8 @@ window.addEventListener('keydown', async (event) => {
         return;
     }
     
-    // Tecla P para alternar modo plugboard
-    if (letter === 'P' && !isProcessing && !rotorConfigMode) {
+    // Tecla 1 para alternar modo plugboard
+    if (event.key === '1' && !isProcessing && !rotorConfigMode) {
         event.preventDefault();
         togglePlugboardMode();
         return;
@@ -1342,7 +1431,7 @@ window.addEventListener('keyup', (event) => {
                 `Rotores: ${toChar(enigmaRotor3.position)} ${toChar(enigmaRotor2.position)} ${toChar(enigmaRotor1.position)}\n` +
                 (plugboardPairs ? `Plugboard: ${plugboardPairs}\n` : '') +
                 `\n` +
-                `P=Plugboard ; = Reset`,
+                `1=Plugboard ; = Reset`,
                 'Aguardando entrada...'
             );
             statusTexture.needsUpdate = true;
